@@ -1,0 +1,23 @@
+appId: uk.servergorazer.taller-equipos
+productName: Taller Equipos Pesados
+directories:
+  output: dist
+  buildResources: build
+files:
+  - out/**
+  - "!out/main/autotest.js"
+  - package.json
+# Sin asar: embedded-postgres ejecuta sus binarios (initdb/postgres) desde node_modules.
+asar: false
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: Taller Equipos Pesados
+  runAfterFinish: true

@@ -1,0 +1,42 @@
+{
+  "name": "mantenimiento-equipos-pesados",
+  "productName": "Taller Equipos Pesados",
+  "version": "1.0.0",
+  "description": "Registro, control y trazabilidad de mantenimientos y reparaciones de maquinaria pesada",
+  "type": "module",
+  "main": "./out/main/index.js",
+  "author": "Gorazer",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:e2e": "electron-vite build && electron out/main/autotest.js",
+    "dist": "electron-vite build && electron-builder --win"
+  },
+  "dependencies": {
+    "embedded-postgres": "^18.4.0-beta.17",
+    "pg": "^8.23.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^26.6.5",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "electron": "^44.7.2",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^6.0.0",
+    "lucide-react": "^1.57.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-router-dom": "^7.18.4",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4"
+  }
+}

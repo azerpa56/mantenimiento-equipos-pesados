@@ -1,7 +1,7 @@
 // Validaciones compartidas: el renderer las usa para mostrar errores por campo
 // y el proceso principal las vuelve a aplicar antes de tocar la base de datos.
 import { z } from 'zod'
-import { FASES, PRIORIDADES, SISTEMAS, TIPOS_OT } from './dominio'
+import { FASES, FLOTAS, PRIORIDADES, SISTEMAS, TIPOS_OT } from './dominio'
 
 const vacio = (v: unknown) => v == null || (typeof v === 'string' && v.trim() === '')
 
@@ -42,7 +42,11 @@ const bool = z.preprocess((v) => v === true || v === 'true' || v === 'on', z.boo
 
 // ---------- Catálogos ----------
 
-export const categoriaSchema = z.object({ nombre: texto(60), activo: bool.default(true) })
+export const categoriaSchema = z.object({
+  nombre: texto(100),
+  flota: z.enum(FLOTAS, { error: 'Seleccione la flota' }),
+  activo: bool.default(true)
+})
 
 export const frenteSchema = z.object({
   nombre: texto(100),
@@ -71,17 +75,28 @@ export const repuestoSchema = z.object({
 
 const anioMax = new Date().getFullYear() + 1
 
-export const equipoSchema = z.object({
-  codigo_interno: texto(30).transform((s) => s.toUpperCase()),
-  numero_serie: texto(60).transform((s) => s.toUpperCase()),
-  marca: texto(60),
-  modelo: texto(60),
-  anio: numNull(n().int('Año inválido').min(1950, 'Año inválido').max(anioMax, 'Año inválido')),
-  categoria_id: idReq('Seleccione la categoría'),
-  horometro_actual: num(n().min(0, 'No puede ser negativo')),
-  frente_actual_id: idOpt,
-  observaciones: textoOpt(2000)
-})
+const mayus = (max: number) =>
+  z.preprocess((v) => (vacio(v) ? null : String(v).trim().toUpperCase()), z.string().max(max, `Máximo ${max} caracteres`).nullable())
+
+export const equipoSchema = z
+  .object({
+    codigo_interno: texto(60).transform((s) => s.toUpperCase()),
+    numero_serie: mayus(60),
+    placa: mayus(20),
+    serial_motor: mayus(60),
+    capacidad: textoOpt(60),
+    marca: texto(60),
+    modelo: texto(60),
+    anio: numNull(n().int('Año inválido').min(1950, 'Año inválido').max(anioMax, 'Año inválido')),
+    categoria_id: idReq('Seleccione la categoría'),
+    horometro_actual: num(n().min(0, 'No puede ser negativo')),
+    frente_actual_id: idOpt,
+    observaciones: textoOpt(2000)
+  })
+  .superRefine((d, ctx) => {
+    if (!d.numero_serie && !d.placa)
+      ctx.addIssue({ code: 'custom', path: ['numero_serie'], message: 'Indique el serial o la placa' })
+  })
 
 export const horometroSchema = z
   .object({

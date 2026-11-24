@@ -154,6 +154,45 @@ app.whenReady().then(async () => {
     igual('dashboard equipos', dash.total_equipos, 3)
     log.push(`INFO dashboard: ${JSON.stringify(dash.equipos_por_estado)} últimos30=${JSON.stringify(dash.ultimos_30)}`)
 
+    // Importación del listado real de flota (si se pasa --excel=ruta)
+    const excel = process.argv.find((a) => a.startsWith('--excel='))?.slice(8)
+    if (excel) {
+      const t0 = Date.now()
+      const pv = await h.importacion.vistaPrevia(excel)
+      log.push(`INFO vista previa en ${Date.now() - t0} ms: total=${pv.total} crear=${pv.crear} actualizar=${pv.actualizar} errores=${pv.errores} categorías nuevas=${pv.categorias_nuevas.length} frentes nuevos=${pv.frentes_nuevos.length}`)
+      for (const f of pv.filas.filter((x) => x.accion === 'error')) log.push(`INFO   error ${f.hoja} fila ${f.fila}: ${f.mensaje}`)
+      for (const f of pv.filas.filter((x) => x.accion !== 'error' && x.mensaje).slice(0, 5)) log.push(`INFO   aviso ${f.hoja} fila ${f.fila}: ${f.mensaje}`)
+      igual('filas leídas (1328 + 182)', pv.total, 1510)
+      igual('filas sin placa ni serial', pv.errores, 2)
+      const t1 = Date.now()
+      const r = await h.importacion.importar(excel)
+      ok(`importados ${r.crear} en ${Date.now() - t1} ms`)
+      const otra = await h.importacion.vistaPrevia(excel)
+      igual('reimportar no duplica (crear)', otra.crear, 0)
+      igual('reimportar: existentes', otra.actualizar, 1508)
+      const hilux = (await h.equipos.listar({ texto: 'A85DR1K' }))[0]
+      igual('código = placa', hilux?.codigo_interno, 'A85DR1K')
+      igual('serial de chasis', hilux?.numero_serie, '8XAFU29G4JR001045')
+      const grua = (await h.equipos.listar({ texto: 'LFCNNF5P9G2000353' }))[0]
+      igual('sin placa: código = serial', grua?.codigo_interno, 'LFCNNF5P9G2000353')
+      igual('categoría sin "↳"', (await h.categorias.listar()).some((c) => c.nombre.startsWith('↳')), false)
+      const fuera = await h.equipos.listar({ estado: 'fuera_servicio' })
+      igual('fuera de servicio (98 inop + 24 desinc + 7 mant + 2 aux inop)', fuera.length, 131)
+      // 400 livianas en el Excel menos las 2 filas sin placa ni serial (un automóvil y una camioneta)
+      igual('flota liviana', (await h.equipos.listar({ flota: 'liviana' })).length, 398)
+      igual('flota pesada', (await h.equipos.listar({ flota: 'pesada' })).length, 1508 + 3 - 398)
+      igual('hilux es liviana', hilux?.flota, 'liviana')
+      igual('OT por flota pesada (EXC/CAM/CAR)', (await h.ordenes.listar({ flota: 'pesada' })).length, 3)
+      igual('OT por flota liviana', (await h.ordenes.listar({ flota: 'liviana' })).length, 0)
+      const volteo = (await h.categorias.listar()).find((c) => c.nombre === 'VOLTEO')!
+      await h.categorias.guardar({ id: volteo.id, datos: { nombre: 'VOLTEO', flota: 'liviana', activo: true } })
+      igual('cambiar flota de una categoría mueve sus equipos', (await h.equipos.listar({ flota: 'liviana' })).length, 398 + 252)
+      await h.categorias.guardar({ id: volteo.id, datos: { nombre: 'VOLTEO', flota: 'pesada', activo: true } })
+      const r2 = await h.importacion.importar(excel)
+      igual('segunda importación: nuevos', r2.crear, 0)
+      igual('total equipos tras 2 importaciones', (await h.equipos.listar()).length, 3 + 1508)
+    }
+
     // PDF del reporte
     app.on('web-contents-created', (_, wc) =>
       wc.on('console-message', (e) => e.level === 'error' && log.push(`CONSOLE ${e.message}`))
@@ -181,6 +220,7 @@ app.whenReady().then(async () => {
       ['equipo', `/equipos/${exc.id}`],
       ['horometros', '/horometros'],
       ['ordenes', '/ordenes?estado='],
+      ['equipos', '/equipos'],
       ['orden-cerrada-2', `/ordenes/${o.id}`]
     ]) {
       await w.webContents.executeJavaScript(`location.hash = '#${ruta}'`)

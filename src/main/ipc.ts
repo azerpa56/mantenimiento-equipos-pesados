@@ -9,6 +9,7 @@ import { traducirError, type Resultado } from './errores'
 import { categorias, frentes, personal, repuestos, type Datos } from './servicios/catalogos'
 import * as equipos from './servicios/equipos'
 import * as horometros from './servicios/horometros'
+import * as importacion from './servicios/importacion'
 import * as metricas from './servicios/metricas'
 import * as ordenes from './servicios/ordenes'
 import * as reportes from './servicios/reportes'
@@ -65,6 +66,11 @@ export const handlers = {
     cambiarEstado: equipos.cambiarEstado,
     eliminar: equipos.eliminar,
     historial: metricas.historialEquipo
+  },
+  importacion: {
+    elegirArchivo: (_: void, e: IpcMainInvokeEvent) => importacion.elegirArchivo(ventana(e)),
+    vistaPrevia: (ruta: string) => importacion.vistaPrevia(ruta),
+    importar: (ruta: string) => importacion.importar(ruta)
   },
   horometros: {
     listar: horometros.listar,

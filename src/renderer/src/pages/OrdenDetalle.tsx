@@ -140,7 +140,7 @@ export function OrdenDetalleVista() {
                 { id: 'trazabilidad', etiqueta: 'Trazabilidad', cuenta: o.fases.length }
               ]}
             />
-            {pestana === 'tecnico' && <DatosTecnicos orden={o} onGuardado={setData} />}
+            {pestana === 'tecnico' && <DatosTecnicos key={o.id} orden={o} onGuardado={setData} />}
             {pestana === 'repuestos' && <Repuestos orden={o} personal={personal} onCambio={setData} />}
             {pestana === 'mano_obra' && <ManoObraTab orden={o} personal={personal} onCambio={setData} />}
             {pestana === 'trazabilidad' && (

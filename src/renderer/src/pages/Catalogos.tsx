@@ -7,7 +7,9 @@ import { api } from '../lib/api'
 import { dinero } from '../lib/formato'
 import { useCarga, useFormulario } from '../lib/hooks'
 import { toast } from '../components/Toasts'
-import { Boton, Campo, Cargando, Encabezado, Entrada, Insignia, Interruptor, Modal, Pestanas, Tabla, Tarjeta, Vacio, td, th } from '../components/ui'
+import type { Flota } from '@shared/dominio'
+import { FlotaInsignia } from '../components/insignias'
+import { Boton, Campo, Cargando, Encabezado, Entrada, Insignia, Interruptor, Modal, Pestanas, Selector, Tabla, Tarjeta, Vacio, td, th } from '../components/ui'
 
 type Pestana = 'personal' | 'repuestos' | 'frentes' | 'categorias'
 type Fila = { id: number; activo: boolean } & Record<string, unknown>
@@ -19,7 +21,7 @@ interface Definicion {
   listar: () => Promise<Fila[]>
   guardar: (a: { id?: number | null; datos: Record<string, unknown> }) => Promise<unknown>
   columnas: { titulo: string; valor: (f: Fila) => ReactNode; derecha?: boolean }[]
-  campos: { k: string; etiqueta: string; requerido?: boolean; tipo?: string; ancho?: 1 | 2 }[]
+  campos: { k: string; etiqueta: string; requerido?: boolean; tipo?: string; ancho?: 1 | 2; opciones?: { valor: string; etiqueta: string }[] }[]
 }
 
 const DEF: Record<Pestana, Definicion> = {
@@ -84,8 +86,22 @@ const DEF: Record<Pestana, Definicion> = {
     esquema: categoriaSchema,
     listar: () => api.categorias.listar() as unknown as Promise<Fila[]>,
     guardar: (a) => api.categorias.guardar(a),
-    columnas: [{ titulo: 'Nombre', valor: (f) => <span className="font-medium">{String(f.nombre)}</span> }],
-    campos: [{ k: 'nombre', etiqueta: 'Nombre', requerido: true, ancho: 2 }]
+    columnas: [
+      { titulo: 'Nombre', valor: (f) => <span className="font-medium">{String(f.nombre)}</span> },
+      { titulo: 'Flota', valor: (f) => <FlotaInsignia v={f.flota as Flota} /> }
+    ],
+    campos: [
+      { k: 'nombre', etiqueta: 'Nombre', requerido: true },
+      {
+        k: 'flota',
+        etiqueta: 'Flota',
+        requerido: true,
+        opciones: [
+          { valor: 'pesada', etiqueta: 'Flota pesada' },
+          { valor: 'liviana', etiqueta: 'Flota liviana' }
+        ]
+      }
+    ]
   }
 }
 
@@ -177,7 +193,8 @@ function Catalogo({ def }: { def: Definicion }) {
 
 function FormularioCatalogo({ def, fila, onCerrar, onHecho }: { def: Definicion; fila: Fila | null; onCerrar: () => void; onHecho: () => void }) {
   const inicial: Record<string, unknown> = { activo: fila?.activo ?? true }
-  for (const c of def.campos) inicial[c.k] = fila?.[c.k] != null ? String(fila[c.k]) : c.k === 'unidad' ? 'UND' : ''
+  for (const c of def.campos)
+    inicial[c.k] = fila?.[c.k] != null ? String(fila[c.k]) : c.k === 'unidad' ? 'UND' : (c.opciones?.[0].valor ?? '')
   const f = useFormulario(inicial)
   const guardar = () =>
     f.enviar(def.esquema, async (v) => {
@@ -210,7 +227,17 @@ function FormularioCatalogo({ def, fila, onCerrar, onHecho }: { def: Definicion;
       >
         {def.campos.map((c, i) => (
           <Campo key={c.k} etiqueta={c.etiqueta} requerido={c.requerido} error={f.errores[c.k]} className={c.ancho === 2 ? 'col-span-2' : ''}>
-            <Entrada type={c.tipo ?? 'text'} step={c.tipo === 'number' ? '0.01' : undefined} autoFocus={i === 0} {...f.campo(c.k)} />
+            {c.opciones ? (
+              <Selector {...f.campo(c.k)}>
+                {c.opciones.map((o) => (
+                  <option key={o.valor} value={o.valor}>
+                    {o.etiqueta}
+                  </option>
+                ))}
+              </Selector>
+            ) : (
+              <Entrada type={c.tipo ?? 'text'} step={c.tipo === 'number' ? '0.01' : undefined} autoFocus={i === 0} {...f.campo(c.k)} />
+            )}
           </Campo>
         ))}
         <div className="col-span-2">

@@ -10,6 +10,9 @@ import { AreaTexto, Boton, Campo, Cargando, Encabezado, Entrada, Selector, Tarje
 const VACIO = {
   codigo_interno: '',
   numero_serie: '',
+  placa: '',
+  serial_motor: '',
+  capacidad: '',
   marca: '',
   modelo: '',
   anio: '',
@@ -33,7 +36,10 @@ export function EquipoFormulario() {
     if (!equipo) return
     setValores({
       codigo_interno: equipo.codigo_interno,
-      numero_serie: equipo.numero_serie,
+      numero_serie: equipo.numero_serie ?? '',
+      placa: equipo.placa ?? '',
+      serial_motor: equipo.serial_motor ?? '',
+      capacidad: equipo.capacidad ?? '',
       marca: equipo.marca,
       modelo: equipo.modelo,
       anio: equipo.anio?.toString() ?? '',
@@ -64,19 +70,49 @@ export function EquipoFormulario() {
       >
         <Tarjeta className="max-w-4xl">
           <div className="grid grid-cols-6 gap-4">
-            <Campo etiqueta="Código interno" requerido error={f.errores.codigo_interno} className="col-span-2">
-              <Entrada {...f.campo('codigo_interno')} placeholder="EXC-012" autoFocus />
+            <Campo etiqueta="Placa" error={f.errores.placa} className="col-span-2" ayuda="La maquinaria pesada puede no tener.">
+              <Entrada
+                {...f.campo('placa')}
+                autoFocus
+                onChange={(e) => {
+                  const viejo = f.valores.placa || f.valores.numero_serie
+                  f.set('placa', e.target.value)
+                  // El código sigue a la placa (o al serial) mientras no se haya escrito otro a mano.
+                  if (!editar && f.valores.codigo_interno === viejo) f.set('codigo_interno', e.target.value || f.valores.numero_serie)
+                }}
+              />
             </Campo>
-            <Campo etiqueta="Número de serie" requerido error={f.errores.numero_serie} className="col-span-2">
-              <Entrada {...f.campo('numero_serie')} />
+            <Campo etiqueta="Serial de chasis / equipo" requerido={!f.valores.placa} error={f.errores.numero_serie} className="col-span-2">
+              <Entrada
+                {...f.campo('numero_serie')}
+                onChange={(e) => {
+                  f.set('numero_serie', e.target.value)
+                  if (!editar && !f.valores.placa && f.valores.codigo_interno === f.valores.numero_serie) f.set('codigo_interno', e.target.value)
+                }}
+              />
+            </Campo>
+            <Campo etiqueta="Código interno" requerido error={f.errores.codigo_interno} className="col-span-2" ayuda="Por defecto, la placa o el serial.">
+              <Entrada {...f.campo('codigo_interno')} />
+            </Campo>
+            <Campo etiqueta="Serial de motor" error={f.errores.serial_motor} className="col-span-2">
+              <Entrada {...f.campo('serial_motor')} />
+            </Campo>
+            <Campo etiqueta="Capacidad" error={f.errores.capacidad} className="col-span-2">
+              <Entrada {...f.campo('capacidad')} placeholder="Ej.: 20 m³, 50 TON, 5000 L" />
             </Campo>
             <Campo etiqueta="Categoría" requerido error={f.errores.categoria_id} className="col-span-2">
               <Selector {...f.campo('categoria_id')}>
                 <option value="">Seleccione…</option>
-                {categorias?.filter((c) => c.activo || String(c.id) === f.valores.categoria_id).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre}
-                  </option>
+                {(['liviana', 'pesada'] as const).map((fl) => (
+                  <optgroup key={fl} label={fl === 'liviana' ? 'Flota liviana' : 'Flota pesada'}>
+                    {categorias
+                      ?.filter((c) => c.flota === fl && (c.activo || String(c.id) === f.valores.categoria_id))
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nombre}
+                        </option>
+                      ))}
+                  </optgroup>
                 ))}
               </Selector>
             </Campo>

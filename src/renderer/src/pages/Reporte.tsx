@@ -105,8 +105,8 @@ export function Reporte() {
                 </td>
               </tr>
               <tr>
-                <th className={cab}>N° de serie</th>
-                <td className={celda}>{o.equipo.numero_serie}</td>
+                <th className={cab}>Placa / serial</th>
+                <td className={celda}>{[o.equipo.placa, o.equipo.numero_serie].filter(Boolean).join(' · ')}</td>
                 <th className={cab}>Categoría</th>
                 <td className={celda}>{o.equipo.categoria}</td>
               </tr>

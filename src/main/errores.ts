@@ -24,6 +24,7 @@ export type Resultado<T> = { ok: true; data: T } | { ok: false; error: string; c
 const UNICOS: Record<string, [string, string]> = {
   equipos_codigo_interno_key: ['codigo_interno', 'Ya existe un equipo con ese código interno'],
   equipos_numero_serie_key: ['numero_serie', 'Ya existe un equipo con ese número de serie'],
+  equipos_placa_key: ['placa', 'Ya existe un equipo con esa placa'],
   repuestos_codigo_key: ['codigo', 'Ya existe un repuesto con ese código'],
   categorias_equipo_nombre_key: ['nombre', 'Ya existe una categoría con ese nombre'],
   frentes_trabajo_nombre_key: ['nombre', 'Ya existe un frente con ese nombre']

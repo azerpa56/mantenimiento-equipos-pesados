@@ -64,7 +64,11 @@ export function NuevaOrden() {
           <Tarjeta titulo="Equipo">
             <Campo etiqueta="Equipo" requerido error={f.errores.equipo_id}>
               <Buscador
-                opciones={(equipos ?? []).map((e) => ({ valor: e.id, etiqueta: e.codigo_interno, detalle: `${e.marca} ${e.modelo} · ${e.categoria}` }))}
+                opciones={(equipos ?? []).map((e) => ({
+                  valor: e.id,
+                  etiqueta: e.codigo_interno,
+                  detalle: [`${e.marca} ${e.modelo}`, e.categoria, e.frente_actual, e.placa && e.placa !== e.codigo_interno ? `Placa ${e.placa}` : null, e.numero_serie !== e.codigo_interno ? e.numero_serie : null].filter(Boolean).join(' · ')
+                }))}
                 valor={Number(v.equipo_id) || ''}
                 onChange={elegirEquipo}
                 placeholder="Buscar por código, marca o modelo…"
@@ -76,7 +80,7 @@ export function NuevaOrden() {
                 <dl className="mt-4 grid grid-cols-4 gap-4 rounded-lg bg-slate-50 p-3">
                   <Dato etiqueta="Estado"><EstadoEquipoInsignia v={equipo.estado} /></Dato>
                   <Dato etiqueta="Horómetro actual">{num(equipo.horometro_actual)} h</Dato>
-                  <Dato etiqueta="Serie">{equipo.numero_serie}</Dato>
+                  <Dato etiqueta={equipo.placa ? 'Placa' : 'Serial'}>{equipo.placa ?? equipo.numero_serie}</Dato>
                   <Dato etiqueta="Frente">{equipo.frente_actual ?? '—'}</Dato>
                 </dl>
                 {equipo.ordenes_abiertas > 0 && (

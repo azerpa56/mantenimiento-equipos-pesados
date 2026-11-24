@@ -14,6 +14,7 @@ export function Ordenes() {
   const fase = q.get('fase') ?? ''
   const tipo = q.get('tipo') ?? ''
   const texto = q.get('texto') ?? ''
+  const flota = q.get('flota') ?? ''
   const set = (k: string, v: string) =>
     setQ((p) => {
       const n = new URLSearchParams(p)
@@ -24,8 +25,15 @@ export function Ordenes() {
     }, { replace: true })
 
   const { data, cargando } = useCarga(
-    () => api.ordenes.listar({ estado: estado || undefined, fase: fase || undefined, tipo: tipo || undefined, texto: texto.trim() || undefined }),
-    [estado, fase, tipo, texto]
+    () =>
+      api.ordenes.listar({
+        estado: estado || undefined,
+        fase: fase || undefined,
+        tipo: tipo || undefined,
+        texto: texto.trim() || undefined,
+        flota: flota || undefined
+      }),
+    [estado, fase, tipo, texto, flota]
   )
 
   return (
@@ -61,6 +69,13 @@ export function Ordenes() {
                   {FASE_INFO[f].n}. {FASE_INFO[f].corto}
                 </option>
               ))}
+            </Selector>
+          </div>
+          <div className="w-44">
+            <Selector value={flota} onChange={(e) => set('flota', e.target.value)}>
+              <option value="">Toda la flota</option>
+              <option value="liviana">Flota liviana</option>
+              <option value="pesada">Flota pesada</option>
             </Selector>
           </div>
           <div className="w-44">

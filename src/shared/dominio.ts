@@ -63,11 +63,21 @@ export const ETIQUETA_ESTADO_REPUESTO: Record<EstadoRepuesto, string> = {
   recibido: 'Recibido'
 }
 
+export const FLOTAS = ['liviana', 'pesada'] as const
+export type Flota = (typeof FLOTAS)[number]
+export const ETIQUETA_FLOTA: Record<Flota, string> = { liviana: 'Flota liviana', pesada: 'Flota pesada' }
+
+/** Flota por defecto según el nombre del tipo (al crear categorías desde la importación). */
+export function flotaSugerida(tipo: string): Flota {
+  const t = tipo.normalize('NFD').replace(/\p{M}/gu, '').trim().toUpperCase()
+  return /^(CAMIONETA|AUTOMOVIL|VAN|AMBULANCIA|MOTOCICLETA|MOTO|CUADRILLERA)\b/.test(t) ? 'liviana' : 'pesada'
+}
+
 export const MONEDA = 'USD'
 
 // ---------- Filas ----------
 
-export interface Categoria { id: number; nombre: string; activo: boolean }
+export interface Categoria { id: number; nombre: string; flota: Flota; activo: boolean }
 export interface Frente { id: number; nombre: string; ubicacion: string | null; activo: boolean }
 export interface Personal {
   id: number; nombre: string; cargo: string | null; especialidad: string | null; costo_hora: number; activo: boolean
@@ -80,12 +90,16 @@ export interface Repuesto {
 export interface Equipo {
   id: number
   codigo_interno: string
-  numero_serie: string
+  numero_serie: string | null
+  placa: string | null
+  serial_motor: string | null
+  capacidad: string | null
   marca: string
   modelo: string
   anio: number | null
   categoria_id: number
   categoria: string
+  flota: Flota
   horometro_actual: number
   estado: EstadoEquipo
   frente_actual_id: number | null
@@ -129,6 +143,7 @@ export interface OrdenResumen {
   responsable_actual: string | null
   costo_total: number
   downtime_horas: number
+  flota: Flota
 }
 
 export interface FaseOrden {
@@ -189,7 +204,7 @@ export interface OrdenDetalle extends OrdenResumen {
   resultado_pruebas: string | null
   recibido_por: string | null
   motivo_cancelacion: string | null
-  equipo: Pick<Equipo, 'codigo_interno' | 'numero_serie' | 'marca' | 'modelo' | 'anio' | 'categoria' | 'horometro_actual' | 'estado'>
+  equipo: Pick<Equipo, 'codigo_interno' | 'numero_serie' | 'placa' | 'marca' | 'modelo' | 'anio' | 'categoria' | 'horometro_actual' | 'estado'>
   fases: FaseOrden[]
   repuestos: OrdenRepuesto[]
   mano_obra: ManoObra[]
@@ -234,6 +249,35 @@ export interface Dashboard {
   repuestos_pendientes: number
   ultimos_30: { ordenes: number; cerradas: number; downtime_horas: number; costo: number }
   top_downtime: { equipo_id: number; codigo: string; descripcion: string; downtime_horas: number; fallas: number }[]
+}
+
+// ---------- Importación desde Excel ----------
+
+export interface FilaImportacion {
+  hoja: string
+  fila: number
+  accion: 'crear' | 'actualizar' | 'error'
+  codigo: string | null
+  tipo: string
+  marca: string
+  modelo: string
+  placa: string | null
+  serial: string | null
+  frente: string | null
+  estado: EstadoEquipo
+  estado_original: string | null
+  mensaje: string | null
+}
+
+export interface ResultadoImportacion {
+  archivo: string
+  total: number
+  crear: number
+  actualizar: number
+  errores: number
+  categorias_nuevas: string[]
+  frentes_nuevos: string[]
+  filas: FilaImportacion[]
 }
 
 // ---------- Fases (máquina de estados) ----------

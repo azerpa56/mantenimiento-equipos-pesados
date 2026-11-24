@@ -1,6 +1,8 @@
 import {
   ETIQUETA_ESTADO_EQUIPO,
   ETIQUETA_ESTADO_ORDEN,
+  ETIQUETA_FLOTA,
+  type Flota,
   ETIQUETA_ESTADO_REPUESTO,
   ETIQUETA_PRIORIDAD,
   ETIQUETA_TIPO_OT,
@@ -20,6 +22,7 @@ const T_PRIORIDAD: Record<Prioridad, Tono> = { baja: 'gris', media: 'azul', alta
 const T_ORDEN: Record<EstadoOrden, Tono> = { abierta: 'ambar', cerrada: 'verde', cancelada: 'gris' }
 const T_REPUESTO: Record<EstadoRepuesto, Tono> = { solicitado: 'ambar', aprobado: 'azul', rechazado: 'gris', recibido: 'verde' }
 
+export const FlotaInsignia = ({ v }: { v: Flota }) => <Insignia tono={v === 'liviana' ? 'violeta' : 'gris'}>{ETIQUETA_FLOTA[v]}</Insignia>
 export const EstadoEquipoInsignia = ({ v }: { v: EstadoEquipo }) => <Insignia tono={T_EQUIPO[v]} punto>{ETIQUETA_ESTADO_EQUIPO[v]}</Insignia>
 export const TipoInsignia = ({ v }: { v: TipoOt }) => <Insignia tono={T_TIPO[v]}>{ETIQUETA_TIPO_OT[v]}</Insignia>
 export const PrioridadInsignia = ({ v }: { v: Prioridad }) => <Insignia tono={T_PRIORIDAD[v]}>{ETIQUETA_PRIORIDAD[v]}</Insignia>

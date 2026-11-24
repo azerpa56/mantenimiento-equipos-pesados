@@ -33,15 +33,16 @@ export const SELECT_RESUMEN = `
          (SELECT p.nombre FROM fases_orden f JOIN personal p ON p.id = f.responsable_id
            WHERE f.orden_id = o.id AND f.fin IS NULL) AS responsable_actual,
          (t.costo_repuestos + t.costo_mano_obra) AS costo_total,
-         t.downtime_horas
+         t.downtime_horas, cat.flota
   FROM ordenes_trabajo o
   JOIN equipos e ON e.id = o.equipo_id
+  JOIN categorias_equipo cat ON cat.id = e.categoria_id
   JOIN v_orden_totales t ON t.orden_id = o.id`
 
 const ORDEN_PRIORIDAD = `CASE o.prioridad WHEN 'critica' THEN 0 WHEN 'alta' THEN 1 WHEN 'media' THEN 2 ELSE 3 END`
 
 export async function listar(
-  f: { estado?: string; fase?: string; tipo?: string; equipo_id?: number; texto?: string } = {}
+  f: { estado?: string; fase?: string; tipo?: string; equipo_id?: number; texto?: string; flota?: string } = {}
 ): Promise<OrdenResumen[]> {
   const cond: string[] = []
   const p: unknown[] = []
@@ -53,6 +54,7 @@ export async function listar(
   if (f.fase) add('o.fase_actual = ?', f.fase)
   if (f.tipo) add('o.tipo = ?', f.tipo)
   if (f.equipo_id) add('o.equipo_id = ?', f.equipo_id)
+  if (f.flota) add('cat.flota = ?', f.flota)
   if (f.texto) add('(o.folio ILIKE ? OR e.codigo_interno ILIKE ? OR o.descripcion ILIKE ?)', `%${f.texto}%`)
   const where = cond.length ? `WHERE ${cond.join(' AND ')}` : ''
   return consulta<OrdenResumen>(
@@ -67,7 +69,7 @@ export async function obtener(id: number): Promise<OrdenDetalle> {
   const [o] = await consulta<OrdenDetalle & Record<string, unknown>>(
     `SELECT r.*, o.solicitado_por, o.horometro_ingreso, o.horometro_salida, o.diagnostico, o.causa_raiz,
             o.trabajo_realizado, o.resultado_pruebas, o.recibido_por, o.motivo_cancelacion,
-            json_build_object('codigo_interno', e.codigo_interno, 'numero_serie', e.numero_serie, 'marca', e.marca,
+            json_build_object('codigo_interno', e.codigo_interno, 'numero_serie', e.numero_serie, 'placa', e.placa, 'marca', e.marca,
                               'modelo', e.modelo, 'anio', e.anio, 'categoria', c.nombre,
                               'horometro_actual', e.horometro_actual, 'estado', e.estado) AS equipo,
             json_build_object('costo_repuestos', t.costo_repuestos, 'costo_mano_obra', t.costo_mano_obra,

@@ -6,7 +6,7 @@ import { api } from '../lib/api'
 import { dinero, duracion, fecha, fechaHora, num } from '../lib/formato'
 import { useCarga } from '../lib/hooks'
 import { toast } from '../components/Toasts'
-import { EstadoEquipoInsignia, EstadoOrdenInsignia, FaseInsignia, TipoInsignia } from '../components/insignias'
+import { EstadoEquipoInsignia, EstadoOrdenInsignia, FlotaInsignia, FaseInsignia, TipoInsignia } from '../components/insignias'
 import { Boton, BotonLink, Cargando, Dato, Encabezado, Indicador, Pestanas, Tabla, Tarjeta, Vacio, td, th } from '../components/ui'
 
 type Pestana = 'intervenciones' | 'fallas' | 'repuestos' | 'uso'
@@ -47,10 +47,10 @@ export function EquipoDetalle() {
         volver="/equipos"
         titulo={
           <span className="flex items-center gap-3">
-            {e.codigo_interno} <EstadoEquipoInsignia v={e.estado} />
+            {e.codigo_interno} <EstadoEquipoInsignia v={e.estado} /> <FlotaInsignia v={e.flota} />
           </span>
         }
-        subtitulo={`${e.marca} ${e.modelo}${e.anio ? ` · ${e.anio}` : ''} · ${e.categoria} · Serie ${e.numero_serie}`}
+        subtitulo={[`${e.marca} ${e.modelo}`, e.anio, e.categoria, e.placa && `Placa ${e.placa}`, e.numero_serie && `Serial ${e.numero_serie}`].filter(Boolean).join(' · ')}
         acciones={
           <>
             {e.estado === 'fuera_servicio' ? (
@@ -215,14 +215,17 @@ export function EquipoDetalle() {
       <Tarjeta titulo="Ficha del equipo" className="mt-6">
         <dl className="grid grid-cols-4 gap-4">
           <Dato etiqueta="Código interno">{e.codigo_interno}</Dato>
-          <Dato etiqueta="N° de serie">{e.numero_serie}</Dato>
+          <Dato etiqueta="Placa">{e.placa ?? '—'}</Dato>
+          <Dato etiqueta="Serial de chasis / equipo">{e.numero_serie ?? '—'}</Dato>
+          <Dato etiqueta="Serial de motor">{e.serial_motor ?? '—'}</Dato>
+          <Dato etiqueta="Capacidad">{e.capacidad ?? '—'}</Dato>
           <Dato etiqueta="Marca / modelo">{e.marca} {e.modelo}</Dato>
           <Dato etiqueta="Año">{e.anio ?? '—'}</Dato>
           <Dato etiqueta="Categoría">{e.categoria}</Dato>
           <Dato etiqueta="Frente actual">{e.frente_actual ?? '—'}</Dato>
           <Dato etiqueta="Registrado">{fecha(new Date(e.creado_en))}</Dato>
           <Dato etiqueta="Última actualización">{fechaHora(e.actualizado_en)}</Dato>
-          {e.observaciones && <Dato etiqueta="Observaciones" className="col-span-4">{e.observaciones}</Dato>}
+          {e.observaciones && <Dato etiqueta="Observaciones" className="col-span-4"><span className="whitespace-pre-line">{e.observaciones}</span></Dato>}
         </dl>
       </Tarjeta>
     </>

@@ -14,11 +14,15 @@ async function unoOFalla<T>(sql: string, params: unknown[], que: string): Promis
 
 // ---------- Categorías ----------
 export const categorias = {
-  listar: () => consulta<Categoria>('SELECT * FROM categorias_equipo ORDER BY nombre'),
+  listar: (f: { flota?: string } = {}) =>
+    f.flota
+      ? consulta<Categoria>('SELECT * FROM categorias_equipo WHERE flota = $1 ORDER BY nombre', [f.flota])
+      : consulta<Categoria>('SELECT * FROM categorias_equipo ORDER BY nombre'),
   async guardar({ id, datos }: Guardar) {
     const d = categoriaSchema.parse(datos)
-    if (id) return unoOFalla<Categoria>('UPDATE categorias_equipo SET nombre=$2, activo=$3 WHERE id=$1 RETURNING *', [id, d.nombre, d.activo], 'La categoría')
-    return (await consulta<Categoria>('INSERT INTO categorias_equipo (nombre, activo) VALUES ($1,$2) RETURNING *', [d.nombre, d.activo]))[0]
+    if (id)
+      return unoOFalla<Categoria>('UPDATE categorias_equipo SET nombre=$2, flota=$3, activo=$4 WHERE id=$1 RETURNING *', [id, d.nombre, d.flota, d.activo], 'La categoría')
+    return (await consulta<Categoria>('INSERT INTO categorias_equipo (nombre, flota, activo) VALUES ($1,$2,$3) RETURNING *', [d.nombre, d.flota, d.activo]))[0]
   }
 }
 

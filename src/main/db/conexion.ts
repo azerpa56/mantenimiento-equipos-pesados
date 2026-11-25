@@ -67,8 +67,54 @@ function crearPool(c: { host: string; port: number; database: string; user: stri
   })
 }
 
+/** Traduce los errores típicos de conexión a un servidor externo. */
+function errorConexion(e: unknown, c: ConfigExterno): Error {
+  const x = e as { code?: string; message?: string }
+  const m = x.message ?? ''
+  const donde = `${c.host}:${c.puerto}`
+  if (x.code === '28P01') return new ReglaNegocio('Usuario o contraseña incorrectos.', 'password')
+  if (x.code === 'ENOTFOUND' || x.code === 'EAI_AGAIN') return new ReglaNegocio(`No se encontró el servidor "${c.host}". Revise el nombre o la IP.`, 'host')
+  if (x.code === 'ECONNREFUSED') return new ReglaNegocio(`El servidor ${donde} rechazó la conexión. Revise el puerto.`, 'puerto')
+  if (x.code === 'ETIMEDOUT' || /timeout/i.test(m))
+    return new ReglaNegocio(`El servidor ${donde} no responde. Revise la IP, el puerto y el firewall del servidor.`)
+  if (/does not support SSL/i.test(m)) return new ReglaNegocio('El servidor no tiene SSL activado: desmarque "Usar SSL".', 'ssl')
+  if (/no pg_hba\.conf entry/i.test(m) && !c.ssl) return new ReglaNegocio('El servidor exige SSL: marque "Usar SSL".', 'ssl')
+  return e instanceof Error ? e : new Error(m || 'No se pudo conectar')
+}
+
+/**
+ * Conecta a un servidor externo. Si la base indicada no existe, la crea
+ * (conectándose a la base "postgres" del mismo servidor) y reintenta.
+ */
+async function conectarExterno(c: ConfigExterno): Promise<pg.Pool> {
+  if (!c.password) throw new ReglaNegocio('Escriba la contraseña del servidor.', 'password')
+  const pool = (database: string) => crearPool({ host: c.host, port: c.puerto, database, user: c.usuario, password: c.password, ssl: c.ssl })
+  let p = pool(c.baseDatos)
+  try {
+    await p.query('SELECT 1')
+    return p
+  } catch (e) {
+    await p.end().catch(() => {})
+    if ((e as { code?: string }).code !== '3D000') throw errorConexion(e, c)
+  }
+  // 3D000: la base no existe.
+  const admin = pool('postgres')
+  try {
+    await admin.query(`CREATE DATABASE ${pg.escapeIdentifier(c.baseDatos)}`)
+  } catch (e) {
+    if ((e as { code?: string }).code === '42501')
+      throw new ReglaNegocio(`La base "${c.baseDatos}" no existe y el usuario no tiene permiso para crearla.`, 'baseDatos')
+    if ((e as { code?: string }).code !== '42P04') throw errorConexion(e, c) // 42P04: ya existe (otra PC la creó)
+  } finally {
+    await admin.end().catch(() => {})
+  }
+  p = pool(c.baseDatos)
+  await p.query('SELECT 1')
+  return p
+}
+
 export async function probarExterno(c: ConfigExterno): Promise<string> {
-  const p = crearPool({ host: c.host, port: c.puerto, database: c.baseDatos, user: c.usuario, password: c.password, ssl: c.ssl })
+  const p = await conectarExterno(c)
   try {
     const { rows } = await p.query<{ v: string }>('SELECT version() AS v')
     return rows[0].v
@@ -82,8 +128,7 @@ async function arrancar(): Promise<EstadoSistema> {
   try {
     if (cfg.modo === 'externo' && cfg.externo) {
       const x = cfg.externo
-      pool = crearPool({ host: x.host, port: x.puerto, database: x.baseDatos, user: x.usuario, password: x.password, ssl: x.ssl })
-      await pool.query('SELECT 1')
+      pool = await conectarExterno(x)
       await migrar(pool)
       return { listo: true, modo: 'externo', detalle: `${x.usuario}@${x.host}:${x.puerto}/${x.baseDatos}` }
     }

@@ -118,7 +118,7 @@ export function Ajustes() {
                 <Aviso tono={prueba.ok ? 'verde' : 'rojo'}>{prueba.ok ? `Conexión correcta · ${prueba.texto}` : prueba.texto}</Aviso>
               </div>
             )}
-            <p className="mt-4 text-xs text-slate-500">La base de datos debe existir; las tablas se crean automáticamente al conectar por primera vez.</p>
+            <p className="mt-4 text-xs text-slate-500">Si la base de datos no existe se crea al conectar (el usuario necesita permiso para crear bases). Las tablas se crean solas la primera vez.</p>
           </Tarjeta>
         )}
 

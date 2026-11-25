@@ -9,6 +9,13 @@ files:
   - package.json
 # Sin asar: embedded-postgres ejecuta sus binarios (initdb/postgres) desde node_modules.
 asar: false
+# PostgreSQL (compilado con MSVC) necesita el runtime de Visual C++ 2015-2022, que un Windows
+# recién instalado puede no traer. Se copia junto a postgres.exe (despliegue local de la app):
+# Windows lo carga desde la carpeta del ejecutable, sin instalar nada ni pedir permisos de admin.
+extraResources:
+  - from: build/vcredist
+    to: app/node_modules/@embedded-postgres/windows-x64/native/bin
+    filter: ["*.dll"]
 win:
   target:
     - target: nsis

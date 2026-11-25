@@ -9,6 +9,8 @@ una flota de maquinaria pesada.
   hora y responsable de cada transición, retrabajo (retornos) y procura con aprobación y llegada de repuestos.
 - **Historial**: intervenciones, fallas recurrentes por sistema, repuestos usados, downtime, costos, MTBF/MTTR.
 - **Reporte**: informe formal de la OT imprimible y exportable a PDF.
+- **Importación**: carga del listado de flota desde Excel con vista previa. Reimportar actualiza sin duplicar.
+- **Flota liviana / pesada**: se define por categoría y sirve para filtrar equipos y órdenes.
 
 ## Stack
 
@@ -24,6 +26,17 @@ una flota de maquinaria pesada.
 Al abrir la app, PostgreSQL embebido arranca solo (datos en `%APPDATA%/mantenimiento-equipos-pesados/pgdata`),
 aplica migraciones y la ventana queda lista. En **Ajustes** se puede apuntar a un servidor
 PostgreSQL de la red para que varias PCs compartan los datos.
+
+## Instalación
+
+`npm run dist` genera `dist/Taller Equipos Pesados Setup <versión>.exe`, un instalador **autocontenido**:
+no hace falta instalar PostgreSQL ni ningún otro programa en la PC destino.
+
+- Incluye PostgreSQL 18 (`initdb`, `postgres`, `pg_ctl`) y el runtime de Visual C++ 2015-2022
+  (`build/vcredist/`, copiado junto a `postgres.exe`), así funciona también en un Windows recién instalado.
+- Se instala por usuario, sin permisos de administrador.
+- En el primer arranque crea el clúster, la base `mantenimiento` y aplica las migraciones. En los siguientes
+  arranques solo aplica las migraciones nuevas, así que al actualizar la app se conservan los datos.
 
 ## Desarrollo
 

@@ -1,7 +1,7 @@
 // Validaciones compartidas: el renderer las usa para mostrar errores por campo
 // y el proceso principal las vuelve a aplicar antes de tocar la base de datos.
 import { z } from 'zod'
-import { FASES, FLOTAS, PRIORIDADES, SISTEMAS, TIPOS_OT } from './dominio'
+import { EJECUCIONES, FASES, FLOTAS, PRIORIDADES, SISTEMAS, TIPOS_OT } from './dominio'
 
 const vacio = (v: unknown) => v == null || (typeof v === 'string' && v.trim() === '')
 
@@ -58,7 +58,8 @@ export const personalSchema = z.object({
   nombre: texto(100),
   cargo: textoOpt(60),
   especialidad: textoOpt(60),
-  costo_hora: num(n().min(0, 'No puede ser negativo')),
+  // Opcional: solo se usa para costear la mano de obra; vacío = 0.
+  costo_hora: z.preprocess((v) => (vacio(v) ? 0 : Number(v)), n().min(0, 'No puede ser negativo')),
   activo: bool.default(true)
 })
 
@@ -76,7 +77,11 @@ export const repuestoSchema = z.object({
 const anioMax = new Date().getFullYear() + 1
 
 const mayus = (max: number) =>
-  z.preprocess((v) => (vacio(v) ? null : String(v).trim().toUpperCase()), z.string().max(max, `Máximo ${max} caracteres`).nullable())
+  z.preprocess(
+    // Sin letras ni números (",,,,", "---") se toma como vacío.
+    (v) => (vacio(v) || !/[\p{L}\p{N}]/u.test(String(v)) ? null : String(v).trim().toUpperCase()),
+    z.string().max(max, `Máximo ${max} caracteres`).nullable()
+  )
 
 export const equipoSchema = z
   .object({
@@ -164,15 +169,28 @@ export const cancelarSchema = z.object({
   motivo: texto(1000).min(5, 'Indique el motivo')
 })
 
+/** Clasificación de la orden: se edita en cualquier fase y no se reinicia. */
 export const datosTecnicosSchema = z.object({
   orden_id: idReq(),
   prioridad: z.enum(PRIORIDADES),
   sistema_afectado: sistemaOpt,
-  diagnostico: textoOpt(4000),
-  causa_raiz: textoOpt(2000),
-  trabajo_realizado: textoOpt(4000),
-  resultado_pruebas: textoOpt(4000)
+  causa_raiz: textoOpt(2000)
 })
+
+/** Entrada de la bitácora técnica (se registra en la fase actual de la orden). */
+export const bitacoraSchema = z
+  .object({
+    orden_id: idReq(),
+    fecha_hora: fechaHora,
+    responsable_id: idReq('Seleccione el responsable'),
+    descripcion: texto(4000),
+    ejecucion: z.enum(EJECUCIONES, { error: 'Indique quién realizó el trabajo' }),
+    taller_externo: textoOpt(100)
+  })
+  .superRefine((d, ctx) => {
+    if (d.ejecucion === 'externo' && !d.taller_externo)
+      ctx.addIssue({ code: 'custom', path: ['taller_externo'], message: 'Indique el taller o proveedor externo' })
+  })
 
 export const ordenRepuestoSchema = z.object({
   orden_id: idReq(),

@@ -8,6 +8,7 @@ import {
   Eye,
   FileDown,
   Flag,
+  NotebookPen,
   PackageCheck,
   PackagePlus,
   Plus,
@@ -20,6 +21,7 @@ import {
   UserRound
 } from 'lucide-react'
 import {
+  BITACORA_FASE,
   ETIQUETA_SISTEMA,
   FASE_INFO,
   FASES,
@@ -30,18 +32,19 @@ import {
   SISTEMAS,
   transicionesPermitidas,
   type AccionFase,
+  type Ejecucion,
   type Fase,
   type OrdenDetalle,
   type Personal
 } from '@shared/dominio'
-import { accionRepuestoSchema, cancelarSchema, datosTecnicosSchema, manoObraSchema, ordenRepuestoSchema } from '@shared/esquemas'
+import { accionRepuestoSchema, bitacoraSchema, cancelarSchema, datosTecnicosSchema, manoObraSchema, ordenRepuestoSchema } from '@shared/esquemas'
 import { api } from '../lib/api'
 import { aInputLocal, dinero, duracion, fecha, fechaHora, horasEntre, hoy, num } from '../lib/formato'
 import { useCarga, useFormulario } from '../lib/hooks'
 import { toast } from '../components/Toasts'
 import { LineaTiempo, Stepper, TransicionModal, horasPorFase } from '../components/fases'
 import { EstadoOrdenInsignia, EstadoRepuestoInsignia, PrioridadInsignia, TipoInsignia } from '../components/insignias'
-import { AreaTexto, Aviso, Boton, Buscador, Campo, Cargando, Dato, Encabezado, Entrada, Modal, Pestanas, Selector, Tabla, Tarjeta, Vacio, td, th } from '../components/ui'
+import { AreaTexto, Aviso, Boton, Buscador, Campo, Cargando, Dato, Encabezado, Entrada, Insignia, Modal, Pestanas, Segmentos, Selector, Tabla, Tarjeta, Vacio, td, th } from '../components/ui'
 
 type Pestana = 'tecnico' | 'repuestos' | 'mano_obra' | 'trazabilidad'
 
@@ -134,13 +137,13 @@ export function OrdenDetalleVista() {
               activa={pestana}
               onChange={setPestana}
               items={[
-                { id: 'tecnico', etiqueta: 'Datos técnicos' },
+                { id: 'tecnico', etiqueta: 'Datos técnicos', cuenta: o.bitacora.length },
                 { id: 'repuestos', etiqueta: 'Repuestos', cuenta: o.repuestos.length },
                 { id: 'mano_obra', etiqueta: 'Mano de obra', cuenta: o.mano_obra.length },
                 { id: 'trazabilidad', etiqueta: 'Trazabilidad', cuenta: o.fases.length }
               ]}
             />
-            {pestana === 'tecnico' && <DatosTecnicos key={o.id} orden={o} onGuardado={setData} />}
+            {pestana === 'tecnico' && <DatosTecnicos key={o.id} orden={o} personal={personal} onGuardado={setData} />}
             {pestana === 'repuestos' && <Repuestos orden={o} personal={personal} onCambio={setData} />}
             {pestana === 'mano_obra' && <ManoObraTab orden={o} personal={personal} onCambio={setData} />}
             {pestana === 'trazabilidad' && (
@@ -211,7 +214,7 @@ function FaseActual({ orden: o, onTransicion, onIrRepuestos }: { orden: OrdenDet
         )}
         {falta && (
           <Aviso tono="azul">
-            Para cerrar esta fase se requiere <strong>{req.etiqueta.toLowerCase()}</strong>. Puede escribirlo en <em>Datos técnicos</em> o al registrar la transición.
+            Para cerrar esta fase se requiere <strong>{req.etiqueta.toLowerCase()}</strong>. Regístrelo en la bitácora (<em>Datos técnicos</em>) o al registrar la transición.
           </Aviso>
         )}
         {bloqueaPorRepuestos && (
@@ -251,46 +254,34 @@ function FaseActual({ orden: o, onTransicion, onIrRepuestos }: { orden: OrdenDet
 
 // ---------- Datos técnicos ----------
 
-function DatosTecnicos({ orden: o, onGuardado }: { orden: OrdenDetalle; onGuardado: (o: OrdenDetalle) => void }) {
+function DatosTecnicos({ orden: o, personal, onGuardado }: { orden: OrdenDetalle; personal: Personal[]; onGuardado: (o: OrdenDetalle) => void }) {
+  return (
+    <div className="space-y-6">
+      <Bitacora orden={o} personal={personal} onCambio={onGuardado} />
+      <Clasificacion orden={o} onGuardado={onGuardado} />
+    </div>
+  )
+}
+
+/** Datos que describen la orden completa (no por fase): se editan en cualquier momento. */
+function Clasificacion({ orden: o, onGuardado }: { orden: OrdenDetalle; onGuardado: (o: OrdenDetalle) => void }) {
   const abierta = o.estado === 'abierta'
-  const f = useFormulario({
-    orden_id: o.id,
-    prioridad: o.prioridad,
-    sistema_afectado: o.sistema_afectado ?? '',
-    diagnostico: o.diagnostico ?? '',
-    causa_raiz: o.causa_raiz ?? '',
-    trabajo_realizado: o.trabajo_realizado ?? '',
-    resultado_pruebas: o.resultado_pruebas ?? ''
-  })
+  const f = useFormulario({ orden_id: o.id, prioridad: o.prioridad, sistema_afectado: o.sistema_afectado ?? '', causa_raiz: o.causa_raiz ?? '' })
   // Si una transición actualiza los datos, refrescar el formulario.
   const { setValores } = f
   useEffect(() => {
-    setValores({
-      orden_id: o.id,
-      prioridad: o.prioridad,
-      sistema_afectado: o.sistema_afectado ?? '',
-      diagnostico: o.diagnostico ?? '',
-      causa_raiz: o.causa_raiz ?? '',
-      trabajo_realizado: o.trabajo_realizado ?? '',
-      resultado_pruebas: o.resultado_pruebas ?? ''
-    })
+    setValores({ orden_id: o.id, prioridad: o.prioridad, sistema_afectado: o.sistema_afectado ?? '', causa_raiz: o.causa_raiz ?? '' })
   }, [o, setValores])
 
   const guardar = () =>
     f.enviar(datosTecnicosSchema, async (v) => {
       onGuardado(await api.ordenes.guardarDatosTecnicos(v))
-      toast.ok('Datos técnicos guardados')
+      toast.ok('Clasificación guardada')
     })
 
   return (
-    <Tarjeta
-      acciones={abierta && <Boton tamano="sm" variante="primario" icono={Save} cargando={f.enviando} onClick={guardar}>Guardar</Boton>}
-      titulo="Información técnica de la intervención"
-    >
+    <Tarjeta titulo="Clasificación de la orden" acciones={abierta && <Boton tamano="sm" icono={Save} cargando={f.enviando} onClick={guardar}>Guardar</Boton>}>
       <div className="grid grid-cols-2 gap-4">
-        <Campo etiqueta="Motivo de ingreso" className="col-span-2">
-          <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm whitespace-pre-line text-slate-700">{o.descripcion}</p>
-        </Campo>
         <Campo etiqueta="Prioridad" error={f.errores.prioridad}>
           <Selector {...f.campo('prioridad')} disabled={!abierta}>
             {PRIORIDADES.map((p) => (
@@ -310,19 +301,132 @@ function DatosTecnicos({ orden: o, onGuardado }: { orden: OrdenDetalle; onGuarda
             ))}
           </Selector>
         </Campo>
-        <Campo etiqueta="Diagnóstico técnico" error={f.errores.diagnostico} className="col-span-2">
-          <AreaTexto {...f.campo('diagnostico')} rows={3} disabled={!abierta} />
-        </Campo>
         <Campo etiqueta="Causa raíz" error={f.errores.causa_raiz} className="col-span-2">
           <Entrada {...f.campo('causa_raiz')} disabled={!abierta} placeholder="Desgaste normal, mala operación, falta de mantenimiento, defecto de fábrica…" />
         </Campo>
-        <Campo etiqueta="Trabajo realizado" error={f.errores.trabajo_realizado} className="col-span-2">
-          <AreaTexto {...f.campo('trabajo_realizado')} rows={3} disabled={!abierta} />
-        </Campo>
-        <Campo etiqueta="Resultado de las pruebas" error={f.errores.resultado_pruebas} className="col-span-2">
-          <AreaTexto {...f.campo('resultado_pruebas')} rows={2} disabled={!abierta} />
-        </Campo>
       </div>
+    </Tarjeta>
+  )
+}
+
+/** Bitácora: cada fase agrega sus entradas; el formulario queda vacío tras cada registro. */
+function Bitacora({ orden: o, personal, onCambio }: { orden: OrdenDetalle; personal: Personal[]; onCambio: (o: OrdenDetalle) => void }) {
+  const abierta = o.estado === 'abierta'
+  const fase = o.fase_actual
+  const actual = o.fases.find((x) => !x.fin)
+  const vacio = () => ({
+    orden_id: o.id,
+    fecha_hora: aInputLocal(),
+    responsable_id: String(actual?.responsable_id ?? ''),
+    descripcion: '',
+    ejecucion: 'interno' as Ejecucion,
+    taller_externo: ''
+  })
+  const f = useFormulario(vacio())
+  const { setValores } = f
+  // Al cambiar de fase el formulario arranca de cero.
+  useEffect(() => {
+    setValores(vacio())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [o.id, fase, setValores])
+
+  const agregar = () =>
+    f.enviar(bitacoraSchema, async (v) => {
+      onCambio(await api.ordenes.agregarBitacora(v))
+      setValores(vacio())
+      toast.ok('Registrado en la bitácora')
+    })
+
+  async function quitar(id: number) {
+    try {
+      onCambio(await api.ordenes.eliminarBitacora(id))
+    } catch (e) {
+      toast.error((e as Error).message)
+    }
+  }
+
+  const info = BITACORA_FASE[fase]
+  // Más reciente primero.
+  const entradas = [...o.bitacora].reverse()
+
+  return (
+    <Tarjeta sinPadding titulo="Información técnica de la intervención">
+      <div className="border-b border-slate-100 px-5 py-4">
+        <div className="text-xs font-semibold text-slate-500 uppercase">Motivo de ingreso</div>
+        <p className="mt-1 text-sm whitespace-pre-line text-slate-700">{o.descripcion}</p>
+      </div>
+
+      {abierta && (
+        <div className="space-y-3 border-b border-slate-100 bg-slate-50/60 px-5 py-4">
+          <Campo
+            requerido
+            error={f.errores.descripcion}
+            etiqueta={
+              <span className="inline-flex items-center gap-2">
+                <Insignia tono="ambar">{FASE_INFO[fase].corto}</Insignia> <span className="text-sm text-slate-800">{info.etiqueta}</span>
+              </span>
+            }
+          >
+            <AreaTexto {...f.campo('descripcion')} rows={3} placeholder={info.placeholder} />
+          </Campo>
+          <div className="grid grid-cols-6 gap-3">
+            <Campo etiqueta="Realizado por" className="col-span-2" error={f.errores.ejecucion}>
+              <Segmentos<Ejecucion>
+                valor={f.valores.ejecucion}
+                onChange={(x) => f.set('ejecucion', x)}
+                opciones={[
+                  { valor: 'interno', etiqueta: 'Interno' },
+                  { valor: 'externo', etiqueta: 'Externo', clase: 'text-violet-700' }
+                ]}
+              />
+            </Campo>
+            {f.valores.ejecucion === 'externo' && (
+              <Campo etiqueta="Taller / proveedor externo" requerido className="col-span-4" error={f.errores.taller_externo}>
+                <Entrada {...f.campo('taller_externo')} placeholder="Ej.: Rectificadora Los Andes" />
+              </Campo>
+            )}
+            <Campo etiqueta="Responsable" requerido className="col-span-3" error={f.errores.responsable_id}>
+              <Selector {...f.campo('responsable_id')}>{opcionesPersonal(personal)}</Selector>
+            </Campo>
+            <Campo etiqueta="Fecha y hora" requerido className="col-span-2" error={f.errores.fecha_hora}>
+              <Entrada type="datetime-local" {...f.campo('fecha_hora')} />
+            </Campo>
+            <div className="col-span-1 flex items-end">
+              <Boton variante="primario" icono={Plus} cargando={f.enviando} onClick={agregar} className="w-full">
+                Agregar
+              </Boton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {entradas.length === 0 ? (
+        <Vacio icono={NotebookPen} titulo="Sin registros" texto="Cada fase agrega aquí su diagnóstico, trabajo realizado, pruebas o notas." />
+      ) : (
+        <ol className="divide-y divide-slate-100">
+          {entradas.map((b) => (
+            <li key={b.id} className="group flex gap-4 px-5 py-3">
+              <div className="w-36 shrink-0 space-y-1">
+                <Insignia tono="gris">{FASE_INFO[b.fase].corto}</Insignia>
+                <div className="text-xs text-slate-500">{fechaHora(b.fecha_hora)}</div>
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                  <span className="font-medium text-slate-700">{BITACORA_FASE[b.fase].etiqueta}</span>
+                  {b.responsable && <span>· {b.responsable}</span>}
+                  {b.ejecucion === 'externo' && <Insignia tono="violeta">Externo · {b.taller_externo}</Insignia>}
+                </div>
+                <p className="mt-1 text-sm whitespace-pre-line text-slate-800">{b.descripcion}</p>
+              </div>
+              {abierta && b.fase === fase && (
+                <button className="invisible self-start text-slate-400 group-hover:visible hover:text-red-600" title="Quitar" onClick={() => quitar(b.id)}>
+                  <Trash2 className="size-4" />
+                </button>
+              )}
+            </li>
+          ))}
+        </ol>
+      )}
     </Tarjeta>
   )
 }
@@ -674,7 +778,7 @@ function ManoObraModal({ orden, personal, onCerrar, onHecho }: { orden: OrdenDet
       }
     >
       <div className="grid grid-cols-2 gap-4">
-        <Campo etiqueta="Técnico" requerido error={f.errores.personal_id} className="col-span-2" ayuda={tecnico ? `Costo: ${dinero(tecnico.costo_hora)}/h` : undefined}>
+        <Campo etiqueta="Técnico" requerido error={f.errores.personal_id} className="col-span-2" ayuda={tecnico?.costo_hora ? `Costo: ${dinero(tecnico.costo_hora)}/h` : undefined}>
           <Selector {...f.campo('personal_id')}>{opcionesPersonal(personal)}</Selector>
         </Campo>
         <Campo etiqueta="Fase" requerido error={f.errores.fase}>

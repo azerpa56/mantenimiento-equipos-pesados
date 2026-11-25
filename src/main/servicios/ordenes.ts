@@ -3,6 +3,7 @@ import {
   FASES_CON_REPUESTOS,
   REQUISITO_SALIDA,
   validarTransicion,
+  type EntradaBitacora,
   type EstadoOrden,
   type Fase,
   type FaseOrden,
@@ -13,6 +14,7 @@ import {
 } from '@shared/dominio'
 import {
   accionRepuestoSchema,
+  bitacoraSchema,
   cancelarSchema,
   datosTecnicosSchema,
   manoObraSchema,
@@ -108,7 +110,68 @@ export async function obtener(id: number): Promise<OrdenDetalle> {
      WHERE m.orden_id = $1 ORDER BY m.fecha, m.id`,
     [id]
   )
+  o.bitacora = await consulta<EntradaBitacora>(
+    `SELECT b.*, p.nombre AS responsable FROM orden_bitacora b LEFT JOIN personal p ON p.id = b.responsable_id
+     WHERE b.orden_id = $1 ORDER BY b.fecha_hora, b.id`,
+    [id]
+  )
   return o
+}
+
+// ---------- Bitácora técnica ----------
+
+/** Fase de la bitácora -> columna resumen de la orden (la usan el requisito de salida y los listados). */
+const RESUMEN_FASE = { diagnostico: 'diagnostico', ejecucion: 'trabajo_realizado', pruebas: 'resultado_pruebas' } as const
+
+/** Recalcula los textos resumen de la orden a partir de su bitácora. */
+async function sincronizarResumen(c: Cliente, ordenId: number) {
+  const sets = Object.entries(RESUMEN_FASE).map(
+    ([fase, col]) =>
+      `${col} = (SELECT string_agg(descripcion || CASE WHEN ejecucion = 'externo' THEN ' [Externo: ' || taller_externo || ']' ELSE '' END,
+                                   E'\\n\\n' ORDER BY fecha_hora, id)
+                 FROM orden_bitacora WHERE orden_id = $1 AND fase = '${fase}')`
+  )
+  await c.query(`UPDATE ordenes_trabajo SET ${sets.join(', ')}, actualizado_en = now() WHERE id = $1`, [ordenId])
+}
+
+async function insertarBitacora(
+  c: Cliente,
+  e: { orden_id: number; fase: Fase; fecha_hora: Date; responsable_id: number | null; descripcion: string; ejecucion?: string; taller_externo?: string | null }
+) {
+  await c.query(
+    `INSERT INTO orden_bitacora (orden_id, fase, fecha_hora, responsable_id, descripcion, ejecucion, taller_externo)
+     VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+    [e.orden_id, e.fase, e.fecha_hora, e.responsable_id, e.descripcion, e.ejecucion ?? 'interno',
+     e.ejecucion === 'externo' ? e.taller_externo : null]
+  )
+}
+
+export async function agregarBitacora(datos: Datos): Promise<OrdenDetalle> {
+  const d = bitacoraSchema.parse(datos)
+  await transaccion(async (c) => {
+    const o = await bloquearOrden(c, d.orden_id)
+    if (d.fecha_hora < o.fecha_apertura)
+      throw new ReglaNegocio(`No puede ser anterior a la apertura de la orden (${fmt(o.fecha_apertura)}).`, 'fecha_hora')
+    await asegurarPersonal(c, d.responsable_id)
+    await insertarBitacora(c, { ...d, fase: o.fase_actual })
+    await sincronizarResumen(c, o.id)
+  })
+  return obtener(d.orden_id)
+}
+
+/** Solo se quitan entradas de la fase en curso: lo de fases cerradas queda como trazabilidad. */
+export async function eliminarBitacora(id: number): Promise<OrdenDetalle> {
+  const ordenId = await transaccion(async (c) => {
+    const { rows } = await c.query<{ orden_id: number; fase: Fase }>('SELECT orden_id, fase FROM orden_bitacora WHERE id = $1', [id])
+    if (!rows[0]) throw new NoEncontrado('La entrada de la bitácora')
+    const o = await bloquearOrden(c, rows[0].orden_id)
+    if (rows[0].fase !== o.fase_actual)
+      throw new ReglaNegocio('Solo se pueden quitar entradas de la fase en curso.')
+    await c.query('DELETE FROM orden_bitacora WHERE id = $1', [id])
+    await sincronizarResumen(c, o.id)
+    return o.id
+  })
+  return obtener(ordenId)
 }
 
 // ---------- Helpers de transacción ----------
@@ -207,19 +270,21 @@ export async function transicionar(datos: Datos): Promise<OrdenDetalle> {
     await asegurarPersonal(c, d.cerrado_por_id)
     await asegurarPersonal(c, d.responsable_id)
 
-    // Lo que venga en la transición completa/pisa los datos técnicos guardados.
-    const tecnicos = {
-      diagnostico: d.diagnostico ?? o.diagnostico,
-      causa_raiz: d.causa_raiz ?? o.causa_raiz,
-      sistema_afectado: d.sistema_afectado ?? o.sistema_afectado,
-      trabajo_realizado: d.trabajo_realizado ?? o.trabajo_realizado,
-      resultado_pruebas: d.resultado_pruebas ?? o.resultado_pruebas
+    // El texto técnico que venga en la transición se agrega a la bitácora de la fase que se cierra.
+    const req = REQUISITO_SALIDA[actual]
+    const texto = req ? d[req.campo] : null
+    if (req && texto) {
+      await insertarBitacora(c, { orden_id: o.id, fase: actual, fecha_hora: d.fecha_hora, responsable_id: d.cerrado_por_id, descripcion: texto })
+      await sincronizarResumen(c, o.id)
     }
+    const { rows: res } = await c.query<Record<string, string | null>>(
+      'SELECT diagnostico, trabajo_realizado, resultado_pruebas FROM ordenes_trabajo WHERE id = $1',
+      [o.id]
+    )
 
     if (d.accion !== 'retornar') {
-      const req = REQUISITO_SALIDA[actual]
-      if (req && !tecnicos[req.campo])
-        throw new ReglaNegocio(`Complete "${req.etiqueta}" para cerrar la fase ${FASE_INFO[actual].corto}.`, req.campo)
+      if (req && !res[0][req.campo])
+        throw new ReglaNegocio(`Registre "${req.etiqueta}" en la bitácora para cerrar la fase ${FASE_INFO[actual].corto}.`, req.campo)
       if (d.destino === 'ejecucion' || d.destino === 'pruebas') {
         const n = await repuestosPendientes(c, o.id)
         if (n > 0)
@@ -260,16 +325,15 @@ export async function transicionar(datos: Datos): Promise<OrdenDetalle> {
     )
     // 4) Actualizar la orden.
     await c.query(
-      `UPDATE ordenes_trabajo SET fase_actual = $2, diagnostico = $3, causa_raiz = $4, sistema_afectado = $5,
-              trabajo_realizado = $6, resultado_pruebas = $7,
-              estado = CASE WHEN $8 THEN 'cerrada' ELSE estado END,
-              fecha_cierre = CASE WHEN $8 THEN $9::timestamptz ELSE fecha_cierre END,
-              recibido_por = CASE WHEN $8 THEN $10 ELSE recibido_por END,
-              horometro_salida = CASE WHEN $8 THEN $11::numeric ELSE horometro_salida END,
+      `UPDATE ordenes_trabajo SET fase_actual = $2, causa_raiz = $3, sistema_afectado = $4,
+              estado = CASE WHEN $5 THEN 'cerrada' ELSE estado END,
+              fecha_cierre = CASE WHEN $5 THEN $6::timestamptz ELSE fecha_cierre END,
+              recibido_por = CASE WHEN $5 THEN $7 ELSE recibido_por END,
+              horometro_salida = CASE WHEN $5 THEN $8::numeric ELSE horometro_salida END,
               actualizado_en = now()
        WHERE id = $1`,
-      [o.id, d.destino, tecnicos.diagnostico, tecnicos.causa_raiz, tecnicos.sistema_afectado,
-       tecnicos.trabajo_realizado, tecnicos.resultado_pruebas, cierra, d.fecha_hora, d.recibido_por, d.horometro_salida]
+      [o.id, d.destino, d.causa_raiz ?? o.causa_raiz, d.sistema_afectado ?? o.sistema_afectado,
+       cierra, d.fecha_hora, d.recibido_por, d.horometro_salida]
     )
     if (cierra) await subirHorometro(c, o.equipo_id, d.horometro_salida)
     await recalcularEstado(c, o.equipo_id)
@@ -316,10 +380,9 @@ export async function guardarDatosTecnicos(datos: Datos): Promise<OrdenDetalle> 
   await transaccion(async (c) => {
     await bloquearOrden(c, d.orden_id)
     await c.query(
-      `UPDATE ordenes_trabajo SET prioridad = $2, sistema_afectado = $3, diagnostico = $4, causa_raiz = $5,
-              trabajo_realizado = $6, resultado_pruebas = $7, actualizado_en = now()
+      `UPDATE ordenes_trabajo SET prioridad = $2, sistema_afectado = $3, causa_raiz = $4, actualizado_en = now()
        WHERE id = $1`,
-      [d.orden_id, d.prioridad, d.sistema_afectado, d.diagnostico, d.causa_raiz, d.trabajo_realizado, d.resultado_pruebas]
+      [d.orden_id, d.prioridad, d.sistema_afectado, d.causa_raiz]
     )
   })
   return obtener(d.orden_id)

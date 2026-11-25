@@ -35,13 +35,13 @@ const DEF: Record<Pestana, Definicion> = {
       { titulo: 'Nombre', valor: (f) => <span className="font-medium">{String(f.nombre)}</span> },
       { titulo: 'Cargo', valor: (f) => (f.cargo as string) ?? '—' },
       { titulo: 'Especialidad', valor: (f) => (f.especialidad as string) ?? '—' },
-      { titulo: 'Costo / hora', valor: (f) => dinero(f.costo_hora as number), derecha: true }
+      { titulo: 'Costo / hora', valor: (f) => (Number(f.costo_hora) ? dinero(f.costo_hora as number) : '—'), derecha: true }
     ],
     campos: [
       { k: 'nombre', etiqueta: 'Nombre completo', requerido: true, ancho: 2 },
       { k: 'cargo', etiqueta: 'Cargo' },
       { k: 'especialidad', etiqueta: 'Especialidad' },
-      { k: 'costo_hora', etiqueta: 'Costo por hora ($)', requerido: true, tipo: 'number' }
+      { k: 'costo_hora', etiqueta: 'Costo por hora ($) — opcional, para costear la mano de obra', tipo: 'number', ancho: 2 }
     ]
   },
   repuestos: {

@@ -137,6 +137,7 @@ export function TransicionModal({
   const abierta = orden.fases.find((f) => !f.fin)
   const actual = orden.fase_actual
   const req = accion !== 'retornar' ? REQUISITO_SALIDA[actual] : undefined
+  const yaRegistrado = orden.bitacora.some((b) => b.fase === actual)
   const pendientes = orden.repuestos.filter((r) => r.estado === 'solicitado' || r.estado === 'aprobado').length
   const bloqueaRepuestos = accion !== 'retornar' && (destino === 'ejecucion' || destino === 'pruebas') && pendientes > 0
   const activos = personal.filter((p) => p.activo)
@@ -150,11 +151,12 @@ export function TransicionModal({
     responsable_id: String(abierta?.responsable_id ?? ''),
     observaciones: '',
     motivo_retorno: '',
-    diagnostico: orden.diagnostico ?? '',
+    // El texto técnico se agrega a la bitácora: arranca vacío.
+    diagnostico: '',
     causa_raiz: orden.causa_raiz ?? '',
     sistema_afectado: orden.sistema_afectado ?? '',
-    trabajo_realizado: orden.trabajo_realizado ?? '',
-    resultado_pruebas: orden.resultado_pruebas ?? '',
+    trabajo_realizado: '',
+    resultado_pruebas: '',
     recibido_por: '',
     horometro_salida: destino === 'liberacion' ? String(orden.equipo.horometro_actual) : ''
   })
@@ -223,10 +225,15 @@ export function TransicionModal({
           </Campo>
         )}
 
-        {/* Datos técnicos exigidos al salir de la fase */}
+        {/* Datos técnicos exigidos al salir de la fase: si ya hay registros en la bitácora, es opcional agregar otro. */}
+        {req && yaRegistrado && (
+          <Aviso tono="verde">
+            Ya hay {req.etiqueta.toLowerCase()} en la bitácora. Puede agregar otra entrada abajo (opcional).
+          </Aviso>
+        )}
         {req?.campo === 'diagnostico' && (
           <div className="space-y-3 rounded-lg border border-slate-200 p-3">
-            <Campo etiqueta="Diagnóstico técnico" requerido error={f.errores.diagnostico}>
+            <Campo etiqueta="Diagnóstico técnico" requerido={!yaRegistrado} error={f.errores.diagnostico}>
               <AreaTexto {...f.campo('diagnostico')} rows={3} />
             </Campo>
             <div className="grid grid-cols-2 gap-3">
@@ -247,12 +254,12 @@ export function TransicionModal({
           </div>
         )}
         {req?.campo === 'trabajo_realizado' && (
-          <Campo etiqueta="Trabajo realizado" requerido error={f.errores.trabajo_realizado}>
+          <Campo etiqueta="Trabajo realizado" requerido={!yaRegistrado} error={f.errores.trabajo_realizado}>
             <AreaTexto {...f.campo('trabajo_realizado')} rows={4} />
           </Campo>
         )}
         {req?.campo === 'resultado_pruebas' && (
-          <Campo etiqueta="Resultado de las pruebas" requerido error={f.errores.resultado_pruebas}>
+          <Campo etiqueta="Resultado de las pruebas" requerido={!yaRegistrado} error={f.errores.resultado_pruebas}>
             <AreaTexto {...f.campo('resultado_pruebas')} rows={3} placeholder="Pruebas de banco/campo realizadas y resultado" />
           </Campo>
         )}

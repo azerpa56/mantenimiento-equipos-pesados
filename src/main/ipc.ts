@@ -86,6 +86,8 @@ export const handlers = {
     transicionar: ordenes.transicionar,
     cancelar: ordenes.cancelar,
     guardarDatosTecnicos: ordenes.guardarDatosTecnicos,
+    agregarBitacora: ordenes.agregarBitacora,
+    eliminarBitacora: ordenes.eliminarBitacora,
     agregarRepuesto: ordenes.agregarRepuesto,
     accionRepuesto: ordenes.accionRepuesto,
     eliminarRepuesto: ordenes.eliminarRepuesto,

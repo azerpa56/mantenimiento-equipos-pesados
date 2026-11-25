@@ -51,7 +51,18 @@ function textoCelda(v: ExcelJS.CellValue): string | null {
 
 const limpio = (v: ExcelJS.CellValue): string | null => {
   const t = textoCelda(v)?.replace(/\s+/g, ' ').trim()
-  return !t || VACIOS.has(t.toUpperCase()) ? null : t
+  // Celdas de relleno sin letras ni números (",,,,", "...", "///") cuentan como vacías.
+  return !t || VACIOS.has(t.toUpperCase()) || !/[\p{L}\p{N}]/u.test(t) ? null : t
+}
+
+/** Placa / serial: mayúsculas, solo letras, números y guiones internos; sin nada útil -> null. */
+const identificador = (s: string | null, max: number): string | null => {
+  const t = s
+    ?.toUpperCase()
+    .replace(/[^\p{L}\p{N}-]/gu, '')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, max)
+  return t && !VACIOS.has(t) ? t : null
 }
 
 interface FilaExcel {
@@ -152,8 +163,8 @@ async function planificar(c: Cliente, ruta: string) {
     const d = f.datos
     const avisos: string[] = []
     const tipo = (d.tipo ?? 'OTRO').replace(/^[↳>\-\s]+/, '').trim() || 'OTRO'
-    const serial = d.serial?.toUpperCase().slice(0, 60) ?? null
-    const placa = d.placa?.toUpperCase().replace(/\s+/g, '').slice(0, 20) ?? null
+    const serial = identificador(d.serial, 60)
+    const placa = identificador(d.placa, 20)
     const codigo = placa ?? serial
     const frente = d.frente && !SIN_FRENTE.has(clave(d.frente)) ? d.frente.slice(0, 100) : null
     const estadoOriginal = d.estado ? clave(d.estado) : null
@@ -181,7 +192,7 @@ async function planificar(c: Cliente, ruta: string) {
       mensaje: null,
       equipo_id: null,
       ordenes_abiertas: 0,
-      serial_motor: d.motor?.toUpperCase().slice(0, 60) ?? null,
+      serial_motor: identificador(d.motor, 60),
       capacidad: d.capacidad?.slice(0, 60) ?? null,
       anio
     }

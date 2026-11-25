@@ -2,11 +2,13 @@ import type pg from 'pg'
 import m001 from './migraciones/001_inicial.sql?raw'
 import m002 from './migraciones/002_identificacion_equipos.sql?raw'
 import m003 from './migraciones/003_flota_categoria.sql?raw'
+import m004 from './migraciones/004_bitacora_orden.sql?raw'
 
 const MIGRACIONES = [
   { version: 1, nombre: '001_inicial', sql: m001 },
   { version: 2, nombre: '002_identificacion_equipos', sql: m002 },
-  { version: 3, nombre: '003_flota_categoria', sql: m003 }
+  { version: 3, nombre: '003_flota_categoria', sql: m003 },
+  { version: 4, nombre: '004_bitacora_orden', sql: m004 }
 ]
 
 /**

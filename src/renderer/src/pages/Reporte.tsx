@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { useParams } from 'react-router-dom'
 import { FileDown, Printer } from 'lucide-react'
 import {
+  BITACORA_FASE,
   ETIQUETA_ESTADO_ORDEN,
   ETIQUETA_ESTADO_REPUESTO,
   ETIQUETA_PRIORIDAD,
@@ -136,12 +137,42 @@ export function Reporte() {
           <div className="grid grid-cols-2 gap-x-6">
             <Texto etiqueta="Motivo de ingreso / síntoma" valor={o.descripcion} />
             <Texto etiqueta="Sistema afectado" valor={o.sistema_afectado ? ETIQUETA_SISTEMA[o.sistema_afectado] : null} />
-            <Texto etiqueta="Diagnóstico técnico" valor={o.diagnostico} />
             <Texto etiqueta="Causa raíz" valor={o.causa_raiz} />
-            <Texto etiqueta="Trabajo realizado" valor={o.trabajo_realizado} />
-            <Texto etiqueta="Resultado de pruebas" valor={o.resultado_pruebas} />
           </div>
           {o.motivo_cancelacion && <Texto etiqueta="Motivo de cancelación" valor={o.motivo_cancelacion} />}
+        </Seccion>
+
+        <Seccion titulo="Bitácora técnica">
+          {o.bitacora.length === 0 ? (
+            <p className="text-slate-500">Sin registros.</p>
+          ) : (
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className={`${cab} w-28`}>Fecha</th>
+                  <th className={`${cab} w-28`}>Fase</th>
+                  <th className={cab}>Descripción</th>
+                  <th className={`${cab} w-36`}>Realizado por</th>
+                </tr>
+              </thead>
+              <tbody>
+                {o.bitacora.map((b) => (
+                  <tr key={b.id} className="break-inside-avoid">
+                    <td className={`${celda} whitespace-nowrap`}>{fechaHora(b.fecha_hora)}</td>
+                    <td className={celda}>
+                      {FASE_INFO[b.fase].corto}
+                      <div className="text-[10px] text-slate-500">{BITACORA_FASE[b.fase].etiqueta}</div>
+                    </td>
+                    <td className={`${celda} whitespace-pre-line`}>{b.descripcion}</td>
+                    <td className={celda}>
+                      {b.ejecucion === 'externo' ? <strong>Externo: {b.taller_externo}</strong> : 'Taller interno'}
+                      {b.responsable && <div className="text-[10px] text-slate-500">Resp.: {b.responsable}</div>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </Seccion>
 
         <Seccion titulo="Horas invertidas por fase">

@@ -194,6 +194,33 @@ export interface ManoObra {
   descripcion: string | null
 }
 
+export const EJECUCIONES = ['interno', 'externo'] as const
+export type Ejecucion = (typeof EJECUCIONES)[number]
+export const ETIQUETA_EJECUCION: Record<Ejecucion, string> = { interno: 'Taller interno', externo: 'Taller externo' }
+
+export interface EntradaBitacora {
+  id: number
+  orden_id: number
+  fase: Fase
+  fecha_hora: Date
+  responsable_id: number | null
+  responsable: string | null
+  descripcion: string
+  ejecucion: Ejecucion
+  taller_externo: string | null
+}
+
+/** Qué se registra en la bitácora según la fase (título del formulario y de cada entrada). */
+export const BITACORA_FASE: Record<Fase, { etiqueta: string; placeholder: string }> = {
+  recepcion: { etiqueta: 'Nota de recepción', placeholder: 'Condición en que llega el equipo, novedades…' },
+  inspeccion: { etiqueta: 'Hallazgos de la inspección', placeholder: 'Fugas, desgaste, ruidos, niveles, daños visibles…' },
+  diagnostico: { etiqueta: 'Diagnóstico técnico', placeholder: 'Falla encontrada, componentes afectados y plan de trabajo…' },
+  procura: { etiqueta: 'Nota de procura', placeholder: 'Cotizaciones, proveedores, tiempos de entrega…' },
+  ejecucion: { etiqueta: 'Trabajo realizado', placeholder: 'Desmontaje, reparación, reemplazo de piezas, ajustes…' },
+  pruebas: { etiqueta: 'Resultado de las pruebas', placeholder: 'Pruebas de banco o de campo realizadas y resultado…' },
+  liberacion: { etiqueta: 'Nota de liberación', placeholder: 'Recomendaciones de operación, próximos servicios…' }
+}
+
 export interface OrdenDetalle extends OrdenResumen {
   solicitado_por: string
   horometro_ingreso: number | null
@@ -208,6 +235,7 @@ export interface OrdenDetalle extends OrdenResumen {
   fases: FaseOrden[]
   repuestos: OrdenRepuesto[]
   mano_obra: ManoObra[]
+  bitacora: EntradaBitacora[]
   totales: {
     costo_repuestos: number
     costo_mano_obra: number

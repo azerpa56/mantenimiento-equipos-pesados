@@ -129,7 +129,7 @@ async function planificar(c: Cliente, ruta: string) {
 
   const { rows: existentes } = await c.query<{ id: number; codigo_interno: string; numero_serie: string | null; placa: string | null; abiertas: number }>(
     `SELECT e.id, e.codigo_interno, e.numero_serie, e.placa,
-            (SELECT COUNT(*) FROM ordenes_trabajo o WHERE o.equipo_id = e.id AND o.estado = 'abierta') AS abiertas
+            (SELECT COUNT(*)::int FROM ordenes_trabajo o WHERE o.equipo_id = e.id AND o.estado = 'abierta') AS abiertas
      FROM equipos e`
   )
   const porSerial = new Map(existentes.filter((e) => e.numero_serie).map((e) => [e.numero_serie!, e]))
@@ -143,7 +143,8 @@ async function planificar(c: Cliente, ruta: string) {
   const categoriasNuevas = new Map<string, string>()
   const frentesNuevos = new Map<string, string>()
 
-  const vistos = new Map<string, string>() // serial/placa/código -> "hoja fila"
+  const vistos = new Map<string, string>() // serial/placa -> "hoja fila"
+  const codigosNuevos = new Map<string, string>() // código de equipos a crear -> "hoja fila"
   const anioMax = new Date().getFullYear() + 1
   const planes: Plan[] = []
 
@@ -219,6 +220,12 @@ async function planificar(c: Cliente, ruta: string) {
     } else if (porCodigo.has(codigo)) {
       plan.accion = 'error'
       plan.mensaje = `El código ${codigo} ya lo usa otro equipo`
+    } else if (codigosNuevos.has(codigo)) {
+      // Ej.: una fila con placa X y otra sin placa con serial X generarían el mismo código.
+      plan.accion = 'error'
+      plan.mensaje = `El código ${codigo} coincide con el de otra fila del archivo (${codigosNuevos.get(codigo)})`
+    } else {
+      codigosNuevos.set(codigo, donde)
     }
 
     if (plan.accion !== 'error') {
